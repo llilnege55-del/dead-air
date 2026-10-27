@@ -1,0 +1,6 @@
+{
+  "version": "1.1",
+  "build": 2,
+  "file": "game/index.html",
+  "notes": "Look up and down with the mouse; invert-look setting; auto-updates."
+}
