@@ -1,6 +1,6 @@
 {
-  "version": "1.3",
-  "build": 4,
+  "version": "1.4",
+  "build": 5,
   "file": "game/index.html",
-  "notes": "The monster now crawls on all fours everywhere."
+  "notes": "The monster is now a real 3D model that crawls on all fours."
 }

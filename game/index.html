@@ -1260,7 +1260,8 @@ function updMonster(dt){
   M.crawl=true;
   if(M.state==='hunt'&&see&&md<2.4&&md>.01){M.x+=(P.x-M.x)/md*sp*dt;M.y+=(P.y-M.y)/md*sp*dt;M.next=null}
   else if(sp>0)stepM(sp*dt);
-  const mv=Math.hypot(M.x-ox,M.y-oy);M.moved=mv>.002;walkPh+=mv*5;if(M.crawl)crawlPh+=mv*7;
+  const mv=Math.hypot(M.x-ox,M.y-oy);M.moved=mv>.002;
+  {const face=M.state==='hunt'||watching||md<4,ty=face?Math.atan2(P.y-M.y,P.x-M.x):(mv>.002?Math.atan2(M.y-oy,M.x-ox):M.yaw||0);M.yaw=(M.yaw||0)+wrap(ty-(M.yaw||0))*Math.min(1,dt*(face?5:4))}walkPh+=mv*5;if(M.crawl)crawlPh+=mv*7;
   {const dd=doorGrid[(M.x|0)+(M.y|0)*MW]||(M.next&&doorGrid[M.next[0]+M.next[1]*MW]);if(dd&&Math.abs(dd.tgt)<.1&&Math.hypot(M.x-dd.cx,M.y-dd.cy)<1.05)openDoor(dd,M.x,M.y,true)}
   if(watching&&twitchT<=0&&rnd()<dt*1.4)twitchT=.14;twitchT-=dt;
   if(watching)P.sig-=dt*(.1+.25*clamp(1-md/9,0,1))*D.drain;else P.sig=Math.min(1,P.sig+dt*D.regen*(hid?2:1));
@@ -1428,9 +1429,72 @@ function monFrame(){
   if(M.moved)return(walkPh|0)%4;
   return 4;
 }
-function drawMon(x,y){const jit=watching&&twitchT>0?(rnd()-.5)*8:0;
-  if(M.crawl&&state!=='scare'){const fr=CRAWL[((watching&&twitchT<=0)?1:(crawlPh|0))%4];const r=swSpr(fr.data,x,y,.75,0,.1,jit);if(r)eyesQ.push({r,fr,sw:256,sh:128});return}
-  const fr=MONF[monFrame()];const r=swSpr(fr.data,x,y,1.3,0,.1,jit);if(r)eyesQ.push({r,fr,sw:128,sh:256})}
+/* ---------- 3D monster (sphere-traced skeleton) ---------- */
+const HAIR=Array.from({length:14},(_,i)=>({s:(i/13-.5)*.16,f:-.02+rnd()*.06,ef:.04+rnd()*.12,es:(i/13-.5)*.24+(rnd()-.5)*.05,ez:.02+rnd()*.06,c:rnd()}));
+const TEETH3=Array.from({length:9},(_,i)=>({s:(i/8-.5)*.1,l:.012+rnd()*.012}));
+const balls=[];
+const MBODY=[86,72,66],MSKIN=[214,205,186],DARK=[8,6,6],MOUTH=[40,4,4],TOOTH=[220,212,190],NAIL=[150,140,120];
+function bl(L,r,col,em){balls.push(L[0],L[1],L[2],r,col,em?1:0)}
+function cap(A,B,r0,r1,col){const len=Math.hypot(B[0]-A[0],B[1]-A[1],B[2]-A[2]),n=Math.max(1,Math.ceil(len/(Math.min(r0,r1)*.75)));
+  for(let i=0;i<=n;i++){const t=i/n;balls.push(A[0]+(B[0]-A[0])*t,A[1]+(B[1]-A[1])*t,A[2]+(B[2]-A[2])*t,r0+(r1-r0)*t,col,0)}}
+function buildMonster3D(){
+  balls.length=0;
+  const cy=Math.cos(M.yaw||0),sy=Math.sin(M.yaw||0),mx=M.x,my=M.y;
+  const L=(f,s,z)=>[mx+f*cy-s*sy,my+f*sy+s*cy,z];
+  const ph=crawlPh,br=Math.sin(time*2.2)*.012,tw=watching&&twitchT>0;
+  const limb=o=>{const a=ph+o;return[Math.sin(a)*.14,Math.max(0,Math.cos(a))*.07]};
+  // spine (hunched back)
+  const pel=[-.28,0,.42+br],mid=[0,0,.52+br],che=[.22,0,.45+br];
+  cap(L(...pel),L(...mid),.13,.15,MBODY);cap(L(...mid),L(...che),.15,.13,MBODY);
+  for(let i=0;i<5;i++){const f=-.18+i*.09;bl(L(f,0,.64+br-Math.abs(f)*.25),.035,MBODY)}
+  // head, hanging low
+  const hj=tw?[(rnd()-.5)*.05,(rnd()-.5)*.06,(rnd()-.5)*.04]:[0,0,0];
+  const hf=.53+hj[0],hs=hj[1],hz0=.3+hj[2]+br;
+  cap(L(.24,0,.46+br),L(hf-.08,hs,hz0+.04),.06,.05,MBODY);
+  bl(L(hf,hs,hz0),.12,MSKIN);bl(L(hf+.03,hs,hz0-.09),.085,MSKIN);bl(L(hf-.03,hs,hz0+.06),.105,MSKIN);
+  for(const e of[-1,1]){bl(L(hf+.085,hs+e*.048,hz0+.02),.038,DARK);bl(L(hf+.112,hs+e*.048,hz0+.024),.007,[255,250,235],1)}
+  bl(L(hf+.11,hs,hz0-.04),.012,DARK);
+  for(let i=0;i<7;i++){const s=(i/6-.5)*.12;bl(L(hf+.095,hs+s,hz0-.105+Math.abs(s)*.15),.022,MOUTH)}
+  for(const t of TEETH3){bl(L(hf+.115,hs+t.s,hz0-.085+Math.abs(t.s)*.15),.008,TOOTH);bl(L(hf+.112,hs+t.s,hz0-.125+Math.abs(t.s)*.15),.007,TOOTH)}
+  for(const h of HAIR){cap(L(hf-.04+h.f,hs+h.s,hz0+.1),L(hf+h.ef,hs+h.es,h.ez+.08*h.c),.012,.008,DARK)}
+  // arms: spider elbows high and wide
+  for(const e of[-1,1]){const[g,lf]=limb(e>0?0:Math.PI);
+    const S=[.22,e*.14,.48+br],E=[.4+g*.5,e*.5,.64],Hd=[.8+g,e*.42,.03+lf];
+    cap(L(...S),L(...E),.05,.035,MBODY);cap(L(...E),L(...Hd),.035,.024,MBODY);bl(L(...E),.04,MBODY);
+    for(let k=-1;k<=1;k++){const T=[Hd[0]+.13,Hd[1]+k*.05,.01+lf*.5];cap(L(...Hd),L(...T),.013,.01,MBODY);bl(L(...T),.011,NAIL)}}
+  // legs folded like a spider's
+  for(const e of[-1,1]){const[g,lf]=limb(e>0?Math.PI:0);
+    const Hp=[-.28,e*.12,.42+br],K=[-.4+g*.5,e*.46,.62],F=[-.78+g,e*.36,.03+lf];
+    cap(L(...Hp),L(...K),.055,.04,MBODY);cap(L(...K),L(...F),.04,.026,MBODY);bl(L(...K),.045,MBODY)}
+}
+function drawMon3D(){
+  const inv=1/(plX*dirY-dirX*plY),kx=W/(2*.66),ky=H;
+  const cdx=M.x-P.x,cdy=M.y-P.y;if(cdx*dirX+cdy*dirY<-1.6)return;
+  buildMonster3D();
+  lmS(M.x,M.y);const la=_r,lb=_t;
+  for(let b=0;b<balls.length;b+=6){
+    const wx=balls[b],wy=balls[b+1],wz=balls[b+2],r=balls[b+3],col=balls[b+4],em=balls[b+5];
+    const dx=wx-P.x,dy=wy-P.y,tY=inv*(-plY*dx+plX*dy);if(tY<.12)continue;
+    const tX=inv*(dirY*dx-dirX*dy),sx=W/2*(1+tX/tY),sy=hz+(.5-wz)*H/tY,rx=r*kx/tY,ry=r*ky/tY;
+    if(sx+rx<0||sx-rx>=W||sy+ry<0||sy-ry>=H)continue;
+    const ff=FD?1-Math.exp(-tY*FD):0,fi=1-ff;
+    if(rx<.7&&ry<.7){const px=sx|0,py=sy|0,idx=py*W+px;if(DB[idx]<=tY-r)continue;const o=idx<<2;
+      if(em){FB[o]=col[0];FB[o+1]=col[1];FB[o+2]=col[2]}else{const fl=flick*CONE[idx]/(1+tY*tY*.11);
+        FB[o]=col[0]*(fl+la*LA0+lb*LB0+AM0)*fi+FC0*ff;FB[o+1]=col[1]*(fl*.93+la*LA1+lb*LB1+AM1)*fi+FC1*ff;FB[o+2]=col[2]*(fl*.8+la*LA2+lb*LB2+AM2)*fi+FC2*ff}
+      DB[idx]=tY-r;continue}
+    const x0=Math.max(0,Math.floor(sx-rx)),x1=Math.min(W-1,Math.ceil(sx+rx)),y0=Math.max(0,Math.floor(sy-ry)),y1=Math.min(H-1,Math.ceil(sy+ry));
+    for(let py=y0;py<=y1;py++){const v=(py+.5-sy)/ry;if(v*v>1)continue;
+      for(let px=x0;px<=x1;px++){const u=(px+.5-sx)/rx,q=u*u+v*v;if(q>1)continue;
+        const nz=Math.sqrt(1-q),d=tY-r*nz,idx=py*W+px;if(DB[idx]<=d)continue;const o=idx<<2;
+        if(em){FB[o]=col[0];FB[o+1]=col[1];FB[o+2]=col[2];DB[idx]=d;continue}
+        const lam=.2+.8*nz-v*.12,gr=1+NT[(idx*13+b)&65535]*.18,fl=flick*CONE[idx]/(1+d*d*.11)*lam,amb=(1-nz)*.06;
+        FB[o]=col[0]*gr*(fl+(la*LA0+lb*LB0)*(.5+.5*lam)+AM0+amb)*fi+FC0*ff;
+        FB[o+1]=col[1]*gr*(fl*.93+(la*LA1+lb*LB1)*(.5+.5*lam)+AM1+amb)*fi+FC1*ff;
+        FB[o+2]=col[2]*gr*(fl*.8+(la*LA2+lb*LB2)*(.5+.5*lam)+AM2+amb)*fi+FC2*ff;
+        DB[idx]=d}}
+  }
+}
+function drawMon(x,y){drawMon3D()}
 function drawSub(){
   if(subFace){drawScareFace(.55,.35)}
   else{g.fillStyle='rgba(255,255,255,.85)';g.font='bold 26px monospace';g.textAlign='center';g.textBaseline='middle';g.fillText(subText,W/2,H/2);g.textAlign='start';g.textBaseline='alphabetic'}
