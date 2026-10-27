@@ -1002,7 +1002,7 @@ document.addEventListener('pointerlockchange',()=>{if(document.pointerLockElemen
 cv.addEventListener('mousedown',e=>{if(state!=='play')return;dragging=true;lastMX=e.clientX;lastMY=e.clientY;if(document.pointerLockElement!==cv)lockMouse()});
 addEventListener('mouseup',()=>dragging=false);
 addEventListener('mousemove',e=>{if(state!=='play')return;
-  if(document.pointerLockElement===cv){mouseDX+=e.movementX;mouseDY+=e.movementY}else if(dragging){mouseDX+=(e.clientX-lastMX)*1.5;mouseDY+=(e.clientY-lastMY)*1.5;lastMX=e.clientX;lastMY=e.clientY}});
+  if(document.pointerLockElement===cv){if(Math.abs(e.movementX)>250||Math.abs(e.movementY)>250)return;mouseDX+=e.movementX;mouseDY+=e.movementY}else if(dragging){mouseDX+=(e.clientX-lastMX)*1.5;mouseDY+=(e.clientY-lastMY)*1.5;lastMX=e.clientX;lastMY=e.clientY}});
 const joy={id:null,x:0,y:0,mag:0,sx:0,sy:0},look={id:null,lx:0,ly:0};
 const joyEl=$('joy'),knob=$('knob');
 cv.addEventListener('touchstart',e=>{e.preventDefault();if(state!=='play')return;const r=stage.getBoundingClientRect();

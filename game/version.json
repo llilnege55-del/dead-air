@@ -1,6 +1,6 @@
 {
-  "version": "1.1",
-  "build": 2,
+  "version": "1.2",
+  "build": 3,
   "file": "game/index.html",
-  "notes": "Look up and down with the mouse; invert-look setting; auto-updates."
+  "notes": "Smoother mouse look: ignores Windows mouse-jump glitches."
 }
